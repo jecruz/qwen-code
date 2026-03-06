@@ -108,12 +108,6 @@ vi.mock('open', () => ({
   default: vi.fn(),
 }));
 
-vi.mock('read-package-up', () => ({
-  readPackageUp: vi.fn(() =>
-    Promise.resolve({ packageJson: { version: 'test-version' } }),
-  ),
-}));
-
 vi.mock('@qwen-code/qwen-code-core', async (importOriginal) => {
   const actualServer = await importOriginal<typeof ServerConfig>();
   const SkillManagerMock = vi.fn();
