@@ -825,44 +825,44 @@ export const useGeminiStream = (
   const handleFinishedEvent = useCallback(
     (event: ServerGeminiFinishedEvent, userMessageTimestamp: number) => {
       const finishReason = event.value.reason;
-      if (!finishReason) {
-        return;
-      }
 
-      const finishReasonMessages: Record<FinishReason, string | undefined> = {
-        [FinishReason.FINISH_REASON_UNSPECIFIED]: undefined,
-        [FinishReason.STOP]: undefined,
-        [FinishReason.MAX_TOKENS]: 'Response truncated due to token limits.',
-        [FinishReason.SAFETY]: 'Response stopped due to safety reasons.',
-        [FinishReason.RECITATION]: 'Response stopped due to recitation policy.',
-        [FinishReason.LANGUAGE]:
-          'Response stopped due to unsupported language.',
-        [FinishReason.BLOCKLIST]: 'Response stopped due to forbidden terms.',
-        [FinishReason.PROHIBITED_CONTENT]:
-          'Response stopped due to prohibited content.',
-        [FinishReason.SPII]:
-          'Response stopped due to sensitive personally identifiable information.',
-        [FinishReason.OTHER]: 'Response stopped for other reasons.',
-        [FinishReason.MALFORMED_FUNCTION_CALL]:
-          'Response stopped due to malformed function call.',
-        [FinishReason.IMAGE_SAFETY]:
-          'Response stopped due to image safety violations.',
-        [FinishReason.UNEXPECTED_TOOL_CALL]:
-          'Response stopped due to unexpected tool call.',
-        [FinishReason.IMAGE_PROHIBITED_CONTENT]:
-          'Response stopped due to image prohibited content.',
-        [FinishReason.NO_IMAGE]: 'Response stopped due to no image.',
-      };
+      if (finishReason !== undefined) {
+        const finishReasonMessages: Record<FinishReason, string | undefined> = {
+          [FinishReason.FINISH_REASON_UNSPECIFIED]: undefined,
+          [FinishReason.STOP]: undefined,
+          [FinishReason.MAX_TOKENS]: 'Response truncated due to token limits.',
+          [FinishReason.SAFETY]: 'Response stopped due to safety reasons.',
+          [FinishReason.RECITATION]:
+            'Response stopped due to recitation policy.',
+          [FinishReason.LANGUAGE]:
+            'Response stopped due to unsupported language.',
+          [FinishReason.BLOCKLIST]: 'Response stopped due to forbidden terms.',
+          [FinishReason.PROHIBITED_CONTENT]:
+            'Response stopped due to prohibited content.',
+          [FinishReason.SPII]:
+            'Response stopped due to sensitive personally identifiable information.',
+          [FinishReason.OTHER]: 'Response stopped for other reasons.',
+          [FinishReason.MALFORMED_FUNCTION_CALL]:
+            'Response stopped due to malformed function call.',
+          [FinishReason.IMAGE_SAFETY]:
+            'Response stopped due to image safety violations.',
+          [FinishReason.UNEXPECTED_TOOL_CALL]:
+            'Response stopped due to unexpected tool call.',
+          [FinishReason.IMAGE_PROHIBITED_CONTENT]:
+            'Response stopped due to image prohibited content.',
+          [FinishReason.NO_IMAGE]: 'Response stopped due to no image.',
+        };
 
-      const message = finishReasonMessages[finishReason];
-      if (message) {
-        addItem(
-          {
-            type: 'info',
-            text: `⚠️  ${message}`,
-          },
-          userMessageTimestamp,
-        );
+        const message = finishReasonMessages[finishReason];
+        if (message) {
+          addItem(
+            {
+              type: 'info',
+              text: `⚠️  ${message}`,
+            },
+            userMessageTimestamp,
+          );
+        }
       }
 
       // Display per-turn token usage stats
@@ -1065,7 +1065,7 @@ export const useGeminiStream = (
             // Display system message from hooks (e.g., Ralph Loop iteration info)
             // This is handled as a content event to show in the UI
             geminiMessageBuffer = handleContentEvent(
-              event.value + '\n',
+              (event as { value: string }).value + '\n',
               geminiMessageBuffer,
               userMessageTimestamp,
             );
@@ -1380,7 +1380,6 @@ export const useGeminiStream = (
 
   const handleCompletedTools = useCallback(
     async (completedToolCallsFromScheduler: TrackedToolCall[]) => {
-
       const completedAndReadyToSubmitTools =
         completedToolCallsFromScheduler.filter(
           (
@@ -1488,7 +1487,6 @@ export const useGeminiStream = (
       );
     },
     [
-      isResponding,
       submitQuery,
       markToolsAsSubmitted,
       geminiClient,

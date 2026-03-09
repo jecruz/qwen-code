@@ -259,7 +259,7 @@
         "skipNextSpeakerCheck": {
           "description": "Skip the next speaker check.",
           "type": "boolean",
-          "default": true
+          "default": false
         },
         "skipLoopDetection": {
           "description": "Disable all loop detection checks (streaming and LLM).",
