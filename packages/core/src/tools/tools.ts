@@ -278,12 +278,58 @@ export abstract class BaseDeclarativeTool<
   TParams extends object,
   TResult extends ToolResult,
 > extends DeclarativeTool<TParams, TResult> {
+  /**
+   * Keys of string parameters that should be trimmed to remove leading/trailing whitespace.
+   * Subclasses can override this to specify which fields to trim.
+   * Defaults to common path and command parameters that suffer from LLM whitespace hallucination.
+   */
+  protected get stringsToTrim(): string[] {
+    return [
+      'file_path',
+      'path',
+      'absolute_path',
+      'directory',
+      'destination',
+      'source',
+      'command',
+      'pattern',
+      'glob',
+      'server_name',
+      'tool_name',
+    ];
+  }
+
+  /**
+   * Normalizes tool parameters by trimming string values and removing common LLM-hallucinated tags.
+   * This fixes issues where the model generates JSON with leading/trailing whitespace
+   * or XML-like placeholders (e.g., file paths with newlines or </parameter> suffixes).
+   */
+  protected normalizeParams(params: TParams): TParams {
+    const normalized: any = {};
+    const trimKeys = new Set(this.stringsToTrim);
+
+    // Regex to remove common LLM hallucinated tags at the beginning or end of strings.
+    // Examples: <parameter>/foo/bar</parameter>, \n/foo/bar, /foo/bar</file_path>
+    const tagRegex = /^(?:\s*<[a-zA-Z0-9_-]+>)+|(?:\s*<\/[a-zA-Z0-9_-]+>)+$/g;
+
+    for (const [key, value] of Object.entries(params)) {
+      if (typeof value === 'string' && trimKeys.has(key)) {
+        // First trim whitespace, then strip hallucinated tags, then trim again.
+        normalized[key] = value.trim().replace(tagRegex, '').trim();
+      } else {
+        normalized[key] = value;
+      }
+    }
+    return normalized as TParams;
+  }
+
   build(params: TParams): ToolInvocation<TParams, TResult> {
-    const validationError = this.validateToolParams(params);
+    const normalizedParams = this.normalizeParams(params);
+    const validationError = this.validateToolParams(normalizedParams);
     if (validationError) {
       throw new Error(validationError);
     }
-    return this.createInvocation(params);
+    return this.createInvocation(normalizedParams);
   }
 
   override validateToolParams(params: TParams): string | null {

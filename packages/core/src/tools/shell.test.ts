@@ -89,6 +89,7 @@ describe('ShellTool', () => {
         }),
       };
     });
+    vi.mocked(fs.existsSync).mockReturnValue(true);
   });
 
   describe('isCommandAllowed', () => {
@@ -185,12 +186,27 @@ describe('ShellTool', () => {
       (mockConfig.getWorkspaceContext as Mock).mockReturnValue(
         createMockWorkspaceContext('/test/dir', ['/another/workspace']),
       );
+      vi.mocked(fs.existsSync).mockReturnValue(true);
       const invocation = shellTool.build({
         command: 'ls',
         directory: '/test/dir/subdir',
         is_background: false,
       });
       expect(invocation).toBeDefined();
+    });
+
+    it('should throw an error for a non-existent directory', () => {
+      (mockConfig.getWorkspaceContext as Mock).mockReturnValue(
+        createMockWorkspaceContext('/test/dir'),
+      );
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      expect(() =>
+        shellTool.build({
+          command: 'ls',
+          directory: '/test/dir/missing',
+          is_background: false,
+        }),
+      ).toThrow("Directory '/test/dir/missing' does not exist.");
     });
 
     it('should include background indicator in description when is_background is true', () => {

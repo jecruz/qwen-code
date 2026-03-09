@@ -361,7 +361,7 @@ describe('ChatCompressionService', () => {
     expect(result.newHistory).toBeNull();
   });
 
-  it('should return FAILED if usage metadata is missing', async () => {
+  it('should compress with estimated tokens if usage metadata is missing', async () => {
     const history: Content[] = [
       { role: 'user', parts: [{ text: 'msg1' }] },
       { role: 'model', parts: [{ text: 'msg2' }] },
@@ -383,7 +383,7 @@ describe('ChatCompressionService', () => {
           },
         },
       ],
-      // No usageMetadata -> keep original token count
+      // No usageMetadata -> fallback to chars/4 estimation
     } as unknown as GenerateContentResponse);
     vi.mocked(mockConfig.getContentGenerator).mockReturnValue({
       generateContent: mockGenerateContent,
@@ -398,12 +398,14 @@ describe('ChatCompressionService', () => {
       false,
     );
 
-    expect(result.info.compressionStatus).toBe(
-      CompressionStatus.COMPRESSION_FAILED_TOKEN_COUNT_ERROR,
-    );
+    // With the fallback, compression should succeed using estimated token counts
+    expect(result.info.compressionStatus).toBe(CompressionStatus.COMPRESSED);
     expect(result.info.originalTokenCount).toBe(800);
-    expect(result.info.newTokenCount).toBe(800);
-    expect(result.newHistory).toBeNull();
+    // newTokenCount should be a positive estimated value (chars/4 of summary + kept history)
+    expect(result.info.newTokenCount).toBeGreaterThan(0);
+    expect(result.info.newTokenCount).toBeLessThan(800);
+    expect(result.newHistory).not.toBeNull();
+    expect(result.newHistory![0].parts![0].text).toBe('Summary');
   });
 
   it('should return FAILED if summary is empty string', async () => {

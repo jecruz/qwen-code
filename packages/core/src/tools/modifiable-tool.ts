@@ -115,14 +115,15 @@ function getUpdatedParams<ToolParams>(
     newContent,
     originalParams,
   );
-  const updatedDiff = Diff.createPatch(
-    path.basename(modifyContext.getFilePath(originalParams)),
-    oldContent,
-    newContent,
-    'Current',
-    'Proposed',
-    DEFAULT_DIFF_OPTIONS,
-  );
+  const updatedDiff =
+    Diff.createPatch(
+      path.basename(modifyContext.getFilePath(originalParams)),
+      oldContent,
+      newContent,
+      'Current',
+      'Proposed',
+      DEFAULT_DIFF_OPTIONS,
+    ) || '';
 
   return { updatedParams, updatedDiff };
 }

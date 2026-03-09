@@ -19,15 +19,15 @@ const mockIsBinary = vi.hoisted(() => vi.fn());
 const mockPlatform = vi.hoisted(() => vi.fn());
 const mockGetPty = vi.hoisted(() => vi.fn());
 const mockSerializeTerminalToObject = vi.hoisted(() => vi.fn());
-const mockGetShellConfiguration = vi.hoisted(() =>
-  vi.fn().mockReturnValue({
-    executable: 'bash',
-    argsPrefix: ['-c'],
-    shell: 'bash',
-  }),
-);
+const mockExistsSync = vi.hoisted(() => vi.fn());
 
 // Top-level Mocks
+vi.mock('node:fs', () => ({
+  default: {
+    existsSync: mockExistsSync,
+  },
+  existsSync: mockExistsSync,
+}));
 vi.mock('@lydell/node-pty', () => ({
   spawn: mockPtySpawn,
 }));
@@ -60,9 +60,6 @@ vi.mock('../utils/getPty.js', () => ({
 }));
 vi.mock('../utils/terminalSerializer.js', () => ({
   serializeTerminalToObject: mockSerializeTerminalToObject,
-}));
-vi.mock('../utils/shell-utils.js', () => ({
-  getShellConfiguration: mockGetShellConfiguration,
 }));
 
 const mockProcessKill = vi
@@ -119,6 +116,7 @@ describe('ShellExecutionService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockExistsSync.mockReturnValue(true);
 
     mockIsBinary.mockReturnValue(false);
     mockPlatform.mockReturnValue('linux');
@@ -351,6 +349,36 @@ describe('ShellExecutionService', () => {
       expect(result.output).toBe('');
       expect(handle.pid).toBeUndefined();
     });
+
+    it('should provide improved error message for ENOENT when directory is missing (PTY)', async () => {
+      const ptyError = new Error('spawn bash ENOENT') as any;
+      ptyError.code = 'ENOENT';
+
+      mockGetPty.mockResolvedValue({
+        module: {
+          spawn: () => {
+            throw ptyError;
+          },
+        },
+        name: 'mock-pty',
+      } as any);
+
+      mockExistsSync.mockReturnValue(false);
+
+      const handle = await ShellExecutionService.execute(
+        'ls',
+        '/missing/dir',
+        onOutputEventMock,
+        new AbortController().signal,
+        true,
+        {},
+      );
+      const result = await handle.result;
+
+      expect(result.error?.message).toContain(
+        "The specified directory (CWD) does not exist: /missing/dir. Original error: spawn bash ENOENT",
+      );
+    });
   });
 
   describe('Aborting Commands', () => {
@@ -420,25 +448,15 @@ describe('ShellExecutionService', () => {
   describe('Platform-Specific Behavior', () => {
     it('should use cmd.exe on Windows', async () => {
       mockPlatform.mockReturnValue('win32');
-      mockGetShellConfiguration.mockReturnValue({
-        executable: 'cmd.exe',
-        argsPrefix: ['/d', '/s', '/c'],
-        shell: 'cmd',
-      });
       await simulateExecution('dir "foo bar"', (pty) =>
         pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null }),
       );
 
       expect(mockPtySpawn).toHaveBeenCalledWith(
         'cmd.exe',
-        ['/d', '/s', '/c', 'dir "foo bar"'],
+        '/c dir "foo bar"',
         expect.any(Object),
       );
-      mockGetShellConfiguration.mockReturnValue({
-        executable: 'bash',
-        argsPrefix: ['-c'],
-        shell: 'bash',
-      });
     });
 
     it('should use bash on Linux', async () => {
@@ -702,6 +720,23 @@ describe('ShellExecutionService child_process fallback', () => {
       expect(result.error).toBe(error);
       expect(result.exitCode).toBe(1);
     });
+
+    it('should provide improved error message for ENOENT when directory is missing (child_process)', async () => {
+      const spawnError = new Error('spawn bash ENOENT') as any;
+      spawnError.code = 'ENOENT';
+
+      mockExistsSync.mockReturnValue(false);
+
+      const { result } = await simulateExecution('ls', (cp) => {
+        cp.emit('error', spawnError);
+        cp.emit('exit', 1, null);
+        cp.emit('close', 1, null);
+      });
+
+      expect(result.error?.message).toContain(
+        "The specified directory (CWD) does not exist: /test/dir. Original error: spawn bash ENOENT",
+      );
+    });
   });
 
   describe('Aborting Commands', () => {
@@ -842,28 +877,18 @@ describe('ShellExecutionService child_process fallback', () => {
   describe('Platform-Specific Behavior', () => {
     it('should use cmd.exe and hide window on Windows', async () => {
       mockPlatform.mockReturnValue('win32');
-      mockGetShellConfiguration.mockReturnValue({
-        executable: 'cmd.exe',
-        argsPrefix: ['/d', '/s', '/c'],
-        shell: 'cmd',
-      });
       await simulateExecution('dir "foo bar"', (cp) =>
         cp.emit('exit', 0, null),
       );
 
       expect(mockCpSpawn).toHaveBeenCalledWith(
         'cmd.exe',
-        ['/d', '/s', '/c', 'dir "foo bar"'],
+        ['/c', 'dir "foo bar"'],
         expect.objectContaining({
           detached: false,
           windowsHide: true,
         }),
       );
-      mockGetShellConfiguration.mockReturnValue({
-        executable: 'bash',
-        argsPrefix: ['-c'],
-        shell: 'bash',
-      });
     });
 
     it('should use bash and detached process group on Linux', async () => {

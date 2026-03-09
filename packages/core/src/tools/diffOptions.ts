@@ -7,10 +7,30 @@
 import * as Diff from 'diff';
 import type { DiffStat } from './tools.js';
 
-export const DEFAULT_DIFF_OPTIONS: Diff.PatchOptions = {
+export const DEFAULT_DIFF_OPTIONS = {
   context: 3,
   ignoreWhitespace: true,
 };
+
+function getStats(patch: Diff.StructuredPatch) {
+  let addedLines = 0;
+  let removedLines = 0;
+  let addedChars = 0;
+  let removedChars = 0;
+
+  patch.hunks.forEach((hunk: Diff.StructuredPatchHunk) => {
+    hunk.lines.forEach((line: string) => {
+      if (line.startsWith('+')) {
+        addedLines++;
+        addedChars += line.length - 1;
+      } else if (line.startsWith('-')) {
+        removedLines++;
+        removedChars += line.length - 1;
+      }
+    });
+  });
+  return { addedLines, removedLines, addedChars, removedChars };
+}
 
 export function getDiffStat(
   fileName: string,
@@ -18,26 +38,6 @@ export function getDiffStat(
   aiStr: string,
   userStr: string,
 ): DiffStat {
-  const getStats = (patch: Diff.ParsedDiff) => {
-    let addedLines = 0;
-    let removedLines = 0;
-    let addedChars = 0;
-    let removedChars = 0;
-
-    patch.hunks.forEach((hunk: Diff.Hunk) => {
-      hunk.lines.forEach((line: string) => {
-        if (line.startsWith('+')) {
-          addedLines++;
-          addedChars += line.length - 1;
-        } else if (line.startsWith('-')) {
-          removedLines++;
-          removedChars += line.length - 1;
-        }
-      });
-    });
-    return { addedLines, removedLines, addedChars, removedChars };
-  };
-
   const modelPatch = Diff.structuredPatch(
     fileName,
     fileName,

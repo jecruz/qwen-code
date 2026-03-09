@@ -639,6 +639,10 @@ export class ShellTool extends BaseDeclarativeTool<
       if (!isWithinWorkspace) {
         return `Directory '${params.directory}' is not within any of the registered workspace directories.`;
       }
+
+      if (!fs.existsSync(params.directory)) {
+        return `Directory '${params.directory}' does not exist. Please create it first using 'mkdir -p' or a similar tool if you intended to run a command in a new directory.`;
+      }
     }
     return null;
   }

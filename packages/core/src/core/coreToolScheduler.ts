@@ -614,7 +614,7 @@ export class CoreToolScheduler {
 
       return {
         ...call,
-        request: { ...call.request, args: args as Record<string, unknown> },
+        request: { ...call.request, args: invocationOrError.params as Record<string, unknown> },
         invocation: invocationOrError,
       };
     });
@@ -828,7 +828,7 @@ export class CoreToolScheduler {
 
           return {
             status: 'validating',
-            request: reqInfo,
+            request: { ...reqInfo, args: invocationOrError.params as Record<string, unknown> },
             tool: toolInstance,
             invocation: invocationOrError,
             startTime: Date.now(),

@@ -6,7 +6,12 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import type { ToolInvocation, ToolResult } from './tools.js';
-import { DeclarativeTool, hasCycleInSchema, Kind } from './tools.js';
+import {
+  BaseDeclarativeTool,
+  DeclarativeTool,
+  hasCycleInSchema,
+  Kind,
+} from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 
 class TestToolInvocation implements ToolInvocation<object, ToolResult> {
@@ -226,5 +231,70 @@ describe('hasCycleInSchema', () => {
 
   it('should return false for an empty schema', () => {
     expect(hasCycleInSchema({})).toBe(false);
+  });
+});
+
+describe('BaseDeclarativeTool', () => {
+  class ConcreteTestTool extends BaseDeclarativeTool<any, ToolResult> {
+    constructor() {
+      super('concrete-test-tool', 'Concrete Test Tool', 'test', Kind.Other, {});
+    }
+    protected createInvocation(params: any): ToolInvocation<any, any> {
+      return { params } as any;
+    }
+    // Access normalizeParams for testing
+    public testNormalize(params: any) {
+      return this.normalizeParams(params);
+    }
+  }
+
+  it('should trim whitespace from specified keys', () => {
+    const tool = new ConcreteTestTool();
+    const params = {
+      file_path: '  /path/to/file  ',
+      absolute_path: '\n/abs/path\n',
+      other: '  no trim  ',
+    };
+    const normalized = tool.testNormalize(params);
+    expect(normalized.file_path).toBe('/path/to/file');
+    expect(normalized.absolute_path).toBe('/abs/path');
+    expect(normalized.other).toBe('  no trim  ');
+  });
+
+  it('should strip common LLM hallucinated tags', () => {
+    const tool = new ConcreteTestTool();
+    const params = {
+      file_path: '<parameter>/path/to/file</parameter>',
+      path: '\n/path/to/file</path>',
+      command: '<command>ls -la</command>',
+      pattern: '<pattern>f(oo)</pattern>',
+      glob: '<glob>**/*.ts</glob>',
+    };
+    const normalized = tool.testNormalize(params);
+    expect(normalized.file_path).toBe('/path/to/file');
+    expect(normalized.path).toBe('/path/to/file');
+    expect(normalized.command).toBe('ls -la');
+    expect(normalized.pattern).toBe('f(oo)');
+    expect(normalized.glob).toBe('**/*.ts');
+  });
+
+  it('should handle multiple tags and whitespace correctly', () => {
+    const tool = new ConcreteTestTool();
+    const params = {
+      file_path:
+        ' <parameter> <file_path> /path/to/file </file_path> </parameter> ',
+    };
+    const normalized = tool.testNormalize(params);
+    expect(normalized.file_path).toBe('/path/to/file');
+  });
+
+  it('should not strip tags in the middle of a string', () => {
+    const tool = new ConcreteTestTool();
+    const params = {
+      command: 'echo "<tag>hello</tag>" && ls',
+    };
+    const normalized = tool.testNormalize(params);
+    // Only leading/trailing tags should be stripped
+    expect(normalized.command).toBe('echo "<tag>hello</tag>" && ls');
   });
 });

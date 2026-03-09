@@ -12,7 +12,7 @@ import { t } from '../../i18n/index.js';
 
 export const compressCommand: SlashCommand = {
   name: 'compress',
-  altNames: ['summarize'],
+  altNames: ['summarize', 'compact'],
   get description() {
     return t('Compresses the context by replacing it with a summary.');
   },

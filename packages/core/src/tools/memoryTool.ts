@@ -253,7 +253,7 @@ Preview of changes to be made to GLOBAL memory:
           'Current',
           'Proposed (Global)',
           DEFAULT_DIFF_OPTIONS,
-        );
+        ) || '';
 
       const confirmationDetails: ToolEditConfirmationDetails = {
         type: 'edit',
@@ -286,14 +286,15 @@ Preview of changes to be made to GLOBAL memory:
     const newContent = computeNewContent(currentContent, this.params.fact);
 
     const fileName = path.basename(memoryFilePath);
-    const fileDiff = Diff.createPatch(
-      fileName,
-      currentContent,
-      newContent,
-      'Current',
-      'Proposed',
-      DEFAULT_DIFF_OPTIONS,
-    );
+    const fileDiff =
+      Diff.createPatch(
+        fileName,
+        currentContent,
+        newContent,
+        'Current',
+        'Proposed',
+        DEFAULT_DIFF_OPTIONS,
+      ) || '';
 
     const confirmationDetails: ToolEditConfirmationDetails = {
       type: 'edit',

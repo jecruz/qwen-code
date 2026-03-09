@@ -218,6 +218,27 @@ export class ChatCompressionService {
             compressionOutputTokenCount,
         );
       }
+
+      // Fallback: estimate tokens from character count when API doesn't provide
+      // usageMetadata (typical for local LLMs via OpenAI-compatible APIs).
+      // Uses chars/4 as a reasonable approximation of token count.
+      if (!canCalculateNewTokenCount) {
+        const estimateTokens = (contents: Content[]) =>
+          Math.ceil(JSON.stringify(contents).length / 4);
+        const summaryContent: Content = {
+          role: 'user',
+          parts: [{ text: summary }],
+        };
+        const ackContent: Content = {
+          role: 'model',
+          parts: [{ text: 'Got it. Thanks for the additional context!' }],
+        };
+        const estimatedNewTokens =
+          estimateTokens([summaryContent, ackContent]) +
+          estimateTokens(historyToKeep);
+        newTokenCount = estimatedNewTokens;
+        canCalculateNewTokenCount = true;
+      }
     }
 
     logChatCompression(

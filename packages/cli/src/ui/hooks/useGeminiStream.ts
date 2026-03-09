@@ -172,6 +172,7 @@ export const useGeminiStream = (
   const isSubmittingQueryRef = useRef(false);
   const lastPromptRef = useRef<PartListUnion | null>(null);
   const lastPromptErroredRef = useRef(false);
+  const submissionIdRef = useRef(0);
   const [isResponding, setIsResponding] = useState<boolean>(false);
   const [thought, setThought] = useState<ThoughtSummary | null>(null);
   const [pendingHistoryItem, pendingHistoryItemRef, setPendingHistoryItem] =
@@ -1100,6 +1101,7 @@ export const useGeminiStream = (
 
       // Set the flag to indicate we're now executing
       isSubmittingQueryRef.current = true;
+      const currentSubmissionId = ++submissionIdRef.current;
 
       const userMessageTimestamp = Date.now();
 
@@ -1228,8 +1230,10 @@ export const useGeminiStream = (
             });
           }
         } finally {
-          setIsResponding(false);
-          isSubmittingQueryRef.current = false;
+          if (currentSubmissionId === submissionIdRef.current) {
+            setIsResponding(false);
+            isSubmittingQueryRef.current = false;
+          }
         }
       });
     },
@@ -1354,9 +1358,6 @@ export const useGeminiStream = (
 
   const handleCompletedTools = useCallback(
     async (completedToolCallsFromScheduler: TrackedToolCall[]) => {
-      if (isResponding) {
-        return;
-      }
 
       const completedAndReadyToSubmitTools =
         completedToolCallsFromScheduler.filter(
