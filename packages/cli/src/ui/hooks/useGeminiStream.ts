@@ -864,12 +864,34 @@ export const useGeminiStream = (
           userMessageTimestamp,
         );
       }
+
+      // Display per-turn token usage stats
+      const usage = event.value.usageMetadata;
+      if (usage) {
+        const promptTokens = usage.promptTokenCount ?? 0;
+        const candidateTokens = usage.candidatesTokenCount ?? 0;
+        const totalTokens = usage.totalTokenCount ?? 0;
+        const contextLimit =
+          config.getContentGeneratorConfig()?.contextWindowSize ?? 0;
+
+        const fmt = (n: number) => n.toLocaleString();
+        let tokenInfo = `📊 tokens: ${fmt(promptTokens)} in / ${fmt(candidateTokens)} out`;
+        if (contextLimit > 0) {
+          const pct = ((totalTokens / contextLimit) * 100).toFixed(1);
+          tokenInfo += ` | context: ${fmt(totalTokens)}/${fmt(contextLimit)} (${pct}%)`;
+        }
+        addItem(
+          { type: MessageType.INFO, text: tokenInfo },
+          userMessageTimestamp,
+        );
+      }
+
       // Only clear auto-retry countdown errors (those with active timer)
       if (retryCountdownTimerRef.current) {
         clearRetryCountdown();
       }
     },
-    [addItem, clearRetryCountdown],
+    [addItem, clearRetryCountdown, config],
   );
 
   const handleChatCompressionEvent = useCallback(

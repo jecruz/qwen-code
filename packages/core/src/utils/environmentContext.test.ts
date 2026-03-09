@@ -120,6 +120,7 @@ describe('getEnvironmentContext', () => {
       'Here is the folder structure of the current working directories:\n\nMock Folder Structure',
     );
     expect(getFolderStructure).toHaveBeenCalledWith('/test/dir', {
+      maxItems: 100,
       fileService: undefined,
     });
   });

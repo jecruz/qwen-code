@@ -22,6 +22,7 @@ export async function getDirectoryContextString(
   const folderStructures = await Promise.all(
     workspaceDirectories.map((dir) =>
       getFolderStructure(dir, {
+        maxItems: 100,
         fileService: config.getFileService(),
       }),
     ),
