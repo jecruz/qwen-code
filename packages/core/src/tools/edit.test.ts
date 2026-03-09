@@ -88,6 +88,9 @@ describe('EditTool', () => {
       setGeminiMdFileCount: vi.fn(),
       getToolRegistry: () => ({}) as any, // Minimal mock for ToolRegistry
       getDefaultFileEncoding: vi.fn().mockReturnValue('utf-8'),
+      storage: {
+        getQwenDir: () => path.join(os.homedir(), '.qwen'),
+      },
     } as unknown as Config;
 
     // Reset mocks before each test
@@ -926,8 +929,8 @@ describe('EditTool', () => {
         await confirmation.onConfirm(ToolConfirmationOutcome.ProceedOnce);
       }
 
-      expect(params.old_string).toBe(initialContent);
-      expect(params.new_string).toBe(modifiedContent);
+      expect(invocation.params.old_string).toBe(initialContent);
+      expect(invocation.params.new_string).toBe(modifiedContent);
     });
   });
 });

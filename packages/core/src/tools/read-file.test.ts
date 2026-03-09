@@ -41,6 +41,7 @@ describe('ReadFileTool', () => {
       storage: {
         getProjectTempDir: () => path.join(tempRootDir, '.temp'),
         getUserSkillsDir: () => path.join(os.homedir(), '.qwen', 'skills'),
+        getQwenDir: () => path.join(os.homedir(), '.qwen'),
       },
       getTruncateToolOutputThreshold: () => 2500,
       getTruncateToolOutputLines: () => 500,

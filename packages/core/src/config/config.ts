@@ -637,7 +637,7 @@ export class Config {
     this.useRipgrep = params.useRipgrep ?? true;
     this.useBuiltinRipgrep = params.useBuiltinRipgrep ?? true;
     this.shouldUseNodePtyShell = params.shouldUseNodePtyShell ?? true;
-    this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? true;
+    this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? false;
     this.shellExecutionConfig = {
       terminalWidth: params.shellExecutionConfig?.terminalWidth ?? 80,
       terminalHeight: params.shellExecutionConfig?.terminalHeight ?? 24,

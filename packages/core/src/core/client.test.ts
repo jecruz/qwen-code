@@ -95,6 +95,7 @@ vi.mock('../utils/getFolderStructure', () => ({
 vi.mock('../utils/errorReporting', () => ({ reportError: vi.fn() }));
 vi.mock('../utils/nextSpeakerChecker', () => ({
   checkNextSpeaker: vi.fn().mockResolvedValue(null),
+  checkContinuationByHeuristic: vi.fn().mockReturnValue(null),
 }));
 vi.mock('../utils/environmentContext', () => ({
   getEnvironmentContext: vi
@@ -1373,12 +1374,13 @@ Other open files:
     });
 
     it('should stop infinite loop after MAX_TURNS when nextSpeaker always returns model', async () => {
-      // Get the mocked checkNextSpeaker function and configure it to trigger infinite loop
-      const { checkNextSpeaker } = await import(
+      // With the clean-STOP optimization, checkContinuationByHeuristic is called
+      // directly (bypassing the LLM round-trip) for clean STOP finish reasons.
+      const { checkContinuationByHeuristic } = await import(
         '../utils/nextSpeakerChecker.js'
       );
-      const mockCheckNextSpeaker = vi.mocked(checkNextSpeaker);
-      mockCheckNextSpeaker.mockResolvedValue({
+      const mockCheckHeuristic = vi.mocked(checkContinuationByHeuristic);
+      mockCheckHeuristic.mockReturnValue({
         next_speaker: 'model',
         reasoning: 'Test case - always continue',
       });
@@ -1391,7 +1393,11 @@ Other open files:
 
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
-        getHistory: vi.fn().mockReturnValue([]),
+        getHistory: vi
+          .fn()
+          .mockReturnValue([
+            { role: 'model', parts: [{ text: 'I will continue.' }] },
+          ]),
         stripThoughtsFromHistory: vi.fn(),
       };
       client['chat'] = mockChat as GeminiChat;
@@ -1432,31 +1438,13 @@ Other open files:
       // Assert
       expect(finalResult).toBeInstanceOf(Turn);
 
-      // Debug: Check how many times checkNextSpeaker was called
-      const callCount = mockCheckNextSpeaker.mock.calls.length;
+      const callCount = mockCheckHeuristic.mock.calls.length;
 
-      // If infinite loop protection is working, checkNextSpeaker should be called many times
-      // but stop at MAX_TURNS (100). Since each recursive call should trigger checkNextSpeaker,
-      // we expect it to be called multiple times before hitting the limit
-      expect(mockCheckNextSpeaker).toHaveBeenCalled();
+      // Heuristic should have been called multiple times (once per recursive turn)
+      // and the loop should be bounded by MAX_TURNS.
+      expect(mockCheckHeuristic).toHaveBeenCalled();
 
-      // The test should demonstrate that the infinite loop protection works:
-      // - If checkNextSpeaker is called many times (close to MAX_TURNS), it shows the loop was happening
-      // - If it's only called once, the recursive behavior might not be triggered
-      if (callCount === 0) {
-        throw new Error(
-          'checkNextSpeaker was never called - the recursive condition was not met',
-        );
-      } else if (callCount === 1) {
-        // This might be expected behavior if the turn has pending tool calls or other conditions prevent recursion
-        console.log(
-          'checkNextSpeaker called only once - no infinite loop occurred',
-        );
-      } else {
-        console.log(
-          `checkNextSpeaker called ${callCount} times - infinite loop protection worked`,
-        );
-        // If called multiple times, we expect it to be stopped before MAX_TURNS
+      if (callCount > 1) {
         expect(callCount).toBeLessThanOrEqual(100); // Should not exceed MAX_TURNS
       }
 

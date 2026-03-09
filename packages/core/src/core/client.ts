@@ -12,6 +12,7 @@ import type {
   PartListUnion,
   Tool,
 } from '@google/genai';
+import { FinishReason } from '@google/genai';
 
 // Config
 import { ApprovalMode, type Config } from '../config/config.js';
@@ -65,7 +66,10 @@ import {
 } from '../services/sessionService.js';
 import { reportError } from '../utils/errorReporting.js';
 import { getErrorMessage } from '../utils/errors.js';
-import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
+import {
+  checkNextSpeaker,
+  checkContinuationByHeuristic,
+} from '../utils/nextSpeakerChecker.js';
 import { flatMapTextParts } from '../utils/partUtils.js';
 import { retryWithBackoff } from '../utils/retry.js';
 
@@ -647,21 +651,42 @@ export class GeminiClient {
         return turn;
       }
 
-      const nextSpeakerCheck = await checkNextSpeaker(
-        this.getChat(),
-        this.config,
-        signal,
-        prompt_id,
-      );
+      const finishReason = turn.finishReason;
+      const isCleanStop =
+        finishReason === FinishReason.STOP || finishReason === undefined;
+
+      let nextSpeakerResult;
+      if (isCleanStop) {
+        // Clean STOP: skip the expensive second LLM function-call round-trip,
+        // which local/OpenAI-compatible models frequently fail to produce correctly.
+        // Rely solely on the text heuristic against the last model message instead.
+        const lastModelMessage = this.getChat()
+          .getHistory()
+          .filter((m) => m.role === 'model')
+          .at(-1);
+        nextSpeakerResult = lastModelMessage
+          ? checkContinuationByHeuristic(lastModelMessage)
+          : null;
+      } else {
+        // Non-STOP finish (MAX_TOKENS, SAFETY, …): still use the full LLM check.
+        nextSpeakerResult = await checkNextSpeaker(
+          this.getChat(),
+          this.config,
+          signal,
+          prompt_id,
+        );
+      }
+
       logNextSpeakerCheck(
         this.config,
         new NextSpeakerCheckEvent(
           prompt_id,
-          turn.finishReason?.toString() || '',
-          nextSpeakerCheck?.next_speaker || '',
+          finishReason?.toString() || '',
+          nextSpeakerResult?.next_speaker || '',
         ),
       );
-      if (nextSpeakerCheck?.next_speaker === 'model') {
+
+      if (nextSpeakerResult?.next_speaker === 'model') {
         const nextRequest = [{ text: 'Please continue.' }];
         // This recursive call's events will be yielded out, and the final
         // turn object from the recursive call will be returned.

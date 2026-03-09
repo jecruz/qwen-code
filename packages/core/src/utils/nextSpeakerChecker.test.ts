@@ -270,4 +270,86 @@ describe('checkNextSpeaker', () => {
     expect(generateJsonCall[0].model).toBe('test-model');
     expect(generateJsonCall[0].promptId).toBe(promptId);
   });
+
+  describe('heuristic fallback (local LLM cannot call function)', () => {
+    it("should return { next_speaker: 'model' } via heuristic when generateJson returns empty and message has continuation phrase", async () => {
+      (chatInstance.getHistory as Mock).mockReturnValue([
+        { role: 'model', parts: [{ text: "Now I'll write the second file." }] },
+      ] as Content[]);
+      // Simulate local LLM that doesn't call the function — returns {}
+      (mockBaseLlmClient.generateJson as Mock).mockResolvedValue({});
+
+      const result = await checkNextSpeaker(
+        chatInstance,
+        mockConfig,
+        abortSignal,
+        promptId,
+      );
+      expect(result).toEqual({
+        reasoning:
+          'Model message contains a continuation-intent phrase (heuristic fallback).',
+        next_speaker: 'model',
+      });
+    });
+
+    it("should return { next_speaker: 'model' } via heuristic when generateJson throws and message has 'let me' phrase", async () => {
+      (chatInstance.getHistory as Mock).mockReturnValue([
+        {
+          role: 'model',
+          parts: [{ text: 'Let me now read the file contents.' }],
+        },
+      ] as Content[]);
+      (mockBaseLlmClient.generateJson as Mock).mockRejectedValue(
+        new Error('Connection refused'),
+      );
+
+      const result = await checkNextSpeaker(
+        chatInstance,
+        mockConfig,
+        abortSignal,
+        promptId,
+      );
+      expect(result).toEqual({
+        reasoning:
+          'Model message contains a continuation-intent phrase (heuristic fallback).',
+        next_speaker: 'model',
+      });
+    });
+
+    it('should return null via heuristic when generateJson returns empty and message is a plain statement', async () => {
+      (chatInstance.getHistory as Mock).mockReturnValue([
+        { role: 'model', parts: [{ text: 'The refactoring is complete.' }] },
+      ] as Content[]);
+      (mockBaseLlmClient.generateJson as Mock).mockResolvedValue({});
+
+      const result = await checkNextSpeaker(
+        chatInstance,
+        mockConfig,
+        abortSignal,
+        promptId,
+      );
+      expect(result).toBeNull();
+    });
+
+    it('should return null via heuristic when generateJson throws and message is a plain statement', async () => {
+      const consoleWarnSpy = vi
+        .spyOn(console, 'warn')
+        .mockImplementation(() => {});
+      (chatInstance.getHistory as Mock).mockReturnValue([
+        { role: 'model', parts: [{ text: 'Done.' }] },
+      ] as Content[]);
+      (mockBaseLlmClient.generateJson as Mock).mockRejectedValue(
+        new Error('API Error'),
+      );
+
+      const result = await checkNextSpeaker(
+        chatInstance,
+        mockConfig,
+        abortSignal,
+        promptId,
+      );
+      expect(result).toBeNull();
+      consoleWarnSpy.mockRestore();
+    });
+  });
 });

@@ -127,12 +127,70 @@ export async function checkNextSpeaker(
     ) {
       return parsedResponse;
     }
-    return null;
+
+    // Fallback: the LLM didn't call the function (common with local models that
+    // struggle with structured output). Analyze the last model turn's text
+    // content for phrases that strongly suggest the model intended to continue.
+    return checkContinuationByHeuristic(lastMessage);
   } catch (error) {
     debugLogger.warn(
       'Failed to talk to Gemini endpoint when seeing if conversation should continue.',
       error,
     );
+    // Even on error, try the heuristic so a local LLM network hiccup doesn't
+    // stop a clearly mid-task run.
+    return checkContinuationByHeuristic(lastMessage);
+  }
+}
+
+/**
+ * Regex patterns that strongly imply the model intended to take a next action
+ * immediately. Used as a fallback when the structured JSON check fails (e.g.,
+ * local LLMs that don't reliably emit function calls).
+ */
+const CONTINUATION_PATTERNS: RegExp[] = [
+  /\bnext[,\s]+i(?:'ll| will)\b/i,
+  /\bnow[,\s]+i(?:'ll| will)\b/i,
+  /\bmoving on to\b/i,
+  /\bi(?:'m| am) going to\b/i,
+  /\bi(?:'ll| will) now\b/i,
+  /\blet me\b/i,
+  /\bi(?:'ll| will) proceed\b/i,
+  /\bstep \d+\b.*\bstep \d+\b/i,
+];
+
+/**
+ * Returns a {@link NextSpeakerResponse} indicating the model should continue if
+ * the last model message contains a strong continuation-intent phrase, otherwise
+ * returns null (stop).
+ */
+export function checkContinuationByHeuristic(
+  lastMessage: Content,
+): NextSpeakerResponse | null {
+  const lastText = (lastMessage.parts ?? [])
+    .map((p) =>
+      typeof p === 'string' ? p : ((p as { text?: string }).text ?? ''),
+    )
+    .join(' ');
+
+  if (!lastText.trim()) {
     return null;
   }
+
+  const matched = CONTINUATION_PATTERNS.some((pattern) =>
+    pattern.test(lastText),
+  );
+
+  if (matched) {
+    debugLogger.debug(
+      'Heuristic fallback: model message contains continuation intent phrase — continuing.',
+    );
+    return {
+      reasoning:
+        'Model message contains a continuation-intent phrase (heuristic fallback).',
+      next_speaker: 'model',
+    };
+  }
+
+  return null;
 }

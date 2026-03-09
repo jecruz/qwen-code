@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as os from 'node:os';
 import * as Diff from 'diff';
 import type {
   ToolCallConfirmationDetails,
@@ -18,6 +19,7 @@ import { BaseDeclarativeTool, Kind, ToolConfirmationOutcome } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
+import { isSubpath } from '../utils/paths.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../config/config.js';
 import { FileEncoding } from '../services/fileSystemService.js';
@@ -281,14 +283,15 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
     }
 
     const fileName = path.basename(this.params.file_path);
-    const fileDiff = Diff.createPatch(
-      fileName,
-      editData.currentContent ?? '',
-      editData.newContent,
-      'Current',
-      'Proposed',
-      DEFAULT_DIFF_OPTIONS,
-    );
+    const fileDiff =
+      Diff.createPatch(
+        fileName,
+        editData.currentContent ?? '',
+        editData.newContent,
+        'Current',
+        'Proposed',
+        DEFAULT_DIFF_OPTIONS,
+      ) || '';
     const ideClient = await IdeClient.getInstance();
     const ideConfirmation =
       this.config.getIdeMode() && ideClient.isDiffingEnabled()
@@ -412,14 +415,15 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
         editData.newContent,
       );
 
-      const fileDiff = Diff.createPatch(
-        fileName,
-        editData.currentContent ?? '', // Should not be null here if not isNewFile
-        editData.newContent,
-        'Current',
-        'Proposed',
-        DEFAULT_DIFF_OPTIONS,
-      );
+      const fileDiff =
+        Diff.createPatch(
+          fileName,
+          editData.currentContent ?? '', // Should not be null here if not isNewFile
+          editData.newContent,
+          'Current',
+          'Proposed',
+          DEFAULT_DIFF_OPTIONS,
+        ) || '';
       const displayResult = {
         fileDiff,
         fileName,
@@ -558,12 +562,24 @@ Expectation for required parameters:
       return "The 'file_path' parameter must be non-empty.";
     }
 
+    // Expand ~ to the user's home directory
+    if (params.file_path.startsWith('~/') || params.file_path === '~') {
+      params.file_path = path.join(os.homedir(), params.file_path.slice(1));
+    }
+
     if (!path.isAbsolute(params.file_path)) {
       return `File path must be absolute: ${params.file_path}`;
     }
 
     const workspaceContext = this.config.getWorkspaceContext();
-    if (!workspaceContext.isPathWithinWorkspace(params.file_path)) {
+    const qwenDir = this.config.storage.getQwenDir();
+    const resolvedFilePath = path.resolve(params.file_path);
+    const isWithinQwenDir = isSubpath(qwenDir, resolvedFilePath);
+
+    if (
+      !workspaceContext.isPathWithinWorkspace(params.file_path) &&
+      !isWithinQwenDir
+    ) {
       const directories = workspaceContext.getDirectories();
       return `File path must be within one of the workspace directories: ${directories.join(', ')}`;
     }

@@ -580,7 +580,7 @@ const SETTINGS_SCHEMA = {
         label: 'Skip Next Speaker Check',
         category: 'Model',
         requiresRestart: false,
-        default: true,
+        default: false,
         description: 'Skip the next speaker check.',
         showInDialog: false,
       },

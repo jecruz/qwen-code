@@ -5,6 +5,7 @@
  */
 
 import path from 'node:path';
+import os from 'node:os';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import type { ToolInvocation, ToolLocation, ToolResult } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
@@ -174,6 +175,14 @@ export class ReadFileTool extends BaseDeclarativeTool<
   protected override validateToolParamValues(
     params: ReadFileToolParams,
   ): string | null {
+    // Expand ~ to the user's home directory
+    if (params.absolute_path.startsWith('~/') || params.absolute_path === '~') {
+      params.absolute_path = path.join(
+        os.homedir(),
+        params.absolute_path.slice(1),
+      );
+    }
+
     const filePath = params.absolute_path;
     if (params.absolute_path.trim() === '') {
       return "The 'absolute_path' parameter must be non-empty.";
@@ -187,16 +196,19 @@ export class ReadFileTool extends BaseDeclarativeTool<
     const globalTempDir = Storage.getGlobalTempDir();
     const projectTempDir = this.config.storage.getProjectTempDir();
     const userSkillsDir = this.config.storage.getUserSkillsDir();
+    const qwenDir = this.config.storage.getQwenDir();
     const resolvedFilePath = path.resolve(filePath);
     const isWithinTempDir =
       isSubpath(projectTempDir, resolvedFilePath) ||
       isSubpath(globalTempDir, resolvedFilePath);
     const isWithinUserSkills = isSubpath(userSkillsDir, resolvedFilePath);
+    const isWithinQwenDir = isSubpath(qwenDir, resolvedFilePath);
 
     if (
       !workspaceContext.isPathWithinWorkspace(filePath) &&
       !isWithinTempDir &&
-      !isWithinUserSkills
+      !isWithinUserSkills &&
+      !isWithinQwenDir
     ) {
       const directories = workspaceContext.getDirectories();
       return `File path must be within one of the workspace directories: ${directories.join(
