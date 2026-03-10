@@ -28,7 +28,7 @@ Qwen Code is an open-source AI agent for the terminal, optimized for [Qwen3-Code
 
 - **Multi-protocol, OAuth free tier**: use OpenAI / Anthropic / Gemini-compatible APIs, or sign in with Qwen OAuth for 1,000 free requests/day.
 - **Open-source, co-evolving**: both the framework and the Qwen3-Coder model are open-source—and they ship and evolve together.
-- **Agentic workflow, feature-rich**: rich built-in tools (Skills, SubAgents) for a full agentic workflow and a Claude Code-like experience.
+- **Agentic workflow, feature-rich**: built-in parallel sub-agents (`spawn_subagent`) and skills for a truly agentic experience, similar to Claude Code.
 - **Terminal-first, IDE-friendly**: built for developers who live in the command line, with optional integration for VS Code, Zed, and JetBrains IDEs.
 
 ## Installation
@@ -391,6 +391,19 @@ Use Qwen Code inside your editor (VS Code, Zed, and JetBrains IDEs):
 Build on top of Qwen Code with the TypeScript SDK:
 
 - [Use the Qwen Code SDK](./packages/sdk-typescript/README.md)
+
+## Parallel Sub-Agent Execution
+
+Qwen Code now supports parallel task execution through sub-agents. This allows the main agent to delegate independent tasks to specialized or general-purpose sub-agents that run simultaneously, significantly speeding up complex workflows.
+
+### How it Works
+When a task is complex or composed of multiple independent parts (e.g., "fix tests in module A" and "refactor module B"), the main agent can use the `spawn_subagent` tool. This tool forks a new agent loop with its own isolated context and tool access.
+
+### Key Benefits
+- **Concurrency**: Run multiple agent tasks at once.
+- **Isolation**: Each sub-agent operates in its own scope, preventing context contamination.
+- **Real-time Progress**: The terminal UI tracks all sub-agents simultaneously, showing their tool calls and current status.
+- **Declarative**: The main agent provides a prompt for the sub-task and receives a high-level summary once completed.
 
 ## Commands & Shortcuts
 
