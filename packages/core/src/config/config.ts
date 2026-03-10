@@ -324,6 +324,7 @@ export interface ConfigParameters {
     enableFuzzySearch?: boolean;
   };
   checkpointing?: boolean;
+  enableAutomaticIndexing?: boolean;
   proxy?: string;
   cwd: string;
   fileDiscoveryService?: FileDiscoveryService;
@@ -484,6 +485,7 @@ export class Config {
   private sessionService: SessionService | undefined = undefined;
   private chatRecordingService: ChatRecordingService | undefined = undefined;
   private readonly checkpointing: boolean;
+  private readonly enableAutomaticIndexing: boolean;
   private readonly proxy: string | undefined;
   private readonly cwd: string;
   private readonly bugCommand: BugCommandSettings | undefined;
@@ -603,6 +605,7 @@ export class Config {
       enableFuzzySearch: params.fileFiltering?.enableFuzzySearch ?? true,
     };
     this.checkpointing = params.checkpointing ?? false;
+    this.enableAutomaticIndexing = params.enableAutomaticIndexing ?? true;
     this.proxy = params.proxy;
     this.cwd = params.cwd ?? process.cwd();
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
@@ -1437,6 +1440,10 @@ export class Config {
 
   getCheckpointingEnabled(): boolean {
     return this.checkpointing;
+  }
+
+  getAutomaticIndexingEnabled(): boolean {
+    return this.enableAutomaticIndexing;
   }
 
   getProxy(): string | undefined {

@@ -5,6 +5,8 @@
  */
 
 import type { Content, Part } from '@google/genai';
+import path from 'node:path';
+import fs from 'node:fs/promises';
 import type { Config } from '../config/config.js';
 import { getFolderStructure } from './getFolderStructure.js';
 
@@ -45,6 +47,66 @@ ${folderStructure}`;
 }
 
 /**
+ * Generates an outline of important files in the workspace.
+ */
+async function getProjectOutline(config: Config): Promise<string> {
+  if (!config.getAutomaticIndexingEnabled()) {
+    return '';
+  }
+
+  const lspClient = config.getLspClient();
+  if (!lspClient) {
+    return '';
+  }
+
+  const workspaceRoot = config.getWorkspaceContext().getDirectories()[0];
+  if (!workspaceRoot) {
+    return '';
+  }
+
+  // Important files to gather outlines for
+  const importantFiles = [
+    'package.json',
+    'README.md',
+    'tsconfig.json',
+    'src/index.ts',
+    'src/main.ts',
+    'index.ts',
+    'main.ts',
+  ];
+
+  const outlines: string[] = [];
+
+  for (const file of importantFiles) {
+    const fullPath = path.resolve(workspaceRoot, file);
+    try {
+      const stats = await fs.stat(fullPath);
+      if (stats.isFile()) {
+        const symbols = await lspClient.documentSymbols(`file://${fullPath}`);
+        if (symbols && symbols.length > 0) {
+          const symbolList = symbols
+            .slice(0, 20) // Limit to top 20 symbols per file
+            .map(
+              (s: { name: string; kind?: string }) =>
+                `  - ${s.name} (${s.kind})`,
+            )
+            .join('\n');
+          outlines.push(`Outline for ${file}:\n${symbolList}`);
+        }
+      }
+    } catch (_error) {
+      // Ignore errors if LSP is not ready or file doesn't exist
+    }
+  }
+
+  if (outlines.length === 0) {
+    return '';
+  }
+
+  return `\n\nProject Outline (Top-level symbols):\n\n${outlines.join('\n\n')}`;
+}
+
+/**
  * Retrieves environment-related information to be included in the chat context.
  * This includes the current working directory, date, operating system, and folder structure.
  * @param {Config} config - The runtime configuration and services.
@@ -59,12 +121,13 @@ export async function getEnvironmentContext(config: Config): Promise<Part[]> {
   });
   const platform = process.platform;
   const directoryContext = await getDirectoryContextString(config);
+  const projectOutline = await getProjectOutline(config);
 
   const context = `
 This is the Qwen Code. We are setting up the context for our chat.
 Today's date is ${today} (formatted according to the user's locale).
 My operating system is: ${platform}
-${directoryContext}
+${directoryContext}${projectOutline}
         `.trim();
 
   return [{ text: context }];

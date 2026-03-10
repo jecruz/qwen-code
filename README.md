@@ -28,7 +28,7 @@ Qwen Code is an open-source AI agent for the terminal, optimized for [Qwen3-Code
 
 - **Multi-protocol, OAuth free tier**: use OpenAI / Anthropic / Gemini-compatible APIs, or sign in with Qwen OAuth for 1,000 free requests/day.
 - **Open-source, co-evolving**: both the framework and the Qwen3-Coder model are open-source—and they ship and evolve together.
-- **Agentic workflow, feature-rich**: built-in parallel sub-agents (`spawn_subagent`) and skills for a truly agentic experience, similar to Claude Code.
+- **Agentic workflow, feature-rich**: built-in parallel sub-agents (`spawn_subagent`), smarter file context loading, and specialized skills for a truly agentic experience, similar to Claude Code.
 - **Terminal-first, IDE-friendly**: built for developers who live in the command line, with optional integration for VS Code, Zed, and JetBrains IDEs.
 
 ## Installation
@@ -397,13 +397,25 @@ Build on top of Qwen Code with the TypeScript SDK:
 Qwen Code now supports parallel task execution through sub-agents. This allows the main agent to delegate independent tasks to specialized or general-purpose sub-agents that run simultaneously, significantly speeding up complex workflows.
 
 ### How it Works
+
 When a task is complex or composed of multiple independent parts (e.g., "fix tests in module A" and "refactor module B"), the main agent can use the `spawn_subagent` tool. This tool forks a new agent loop with its own isolated context and tool access.
 
 ### Key Benefits
+
 - **Concurrency**: Run multiple agent tasks at once.
 - **Isolation**: Each sub-agent operates in its own scope, preventing context contamination.
 - **Real-time Progress**: The terminal UI tracks all sub-agents simultaneously, showing their tool calls and current status.
 - **Declarative**: The main agent provides a prompt for the sub-task and receives a high-level summary once completed.
+
+## Smarter File Context Loading
+
+Qwen Code proactively gathers project context before the first model turn. This feature indexes the project's file structure and extracts top-level symbols (outlines) from key files (like `package.json`, `README.md`, or main source files) using the Language Server Protocol (LSP).
+
+### Key Benefits
+
+- **Zero-Turn Context**: Qwen understands your project structure before you even ask your first question.
+- **Symbol Awareness**: By indexing important file outlines, the model knows about your main classes, functions, and modules from the start.
+- **Improved Proactivity**: Reduces the need for the model to manually run `ls` or `grep` just to understand the basic codebase layout.
 
 ## Commands & Shortcuts
 
