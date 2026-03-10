@@ -1140,9 +1140,12 @@ export class CoreToolScheduler {
         (call) => call.status === 'scheduled',
       );
 
-      for (const toolCall of callsToExecute) {
-        await this.executeSingleToolCall(toolCall, signal);
-      }
+      // Execute all scheduled tool calls in parallel.
+      await Promise.all(
+        callsToExecute.map((toolCall) =>
+          this.executeSingleToolCall(toolCall, signal),
+        ),
+      );
     }
   }
 

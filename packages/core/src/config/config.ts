@@ -54,6 +54,7 @@ import { ReadFileTool } from '../tools/read-file.js';
 import { canUseRipgrep } from '../utils/ripgrepUtils.js';
 import { RipGrepTool } from '../tools/ripGrep.js';
 import { ShellTool } from '../tools/shell.js';
+import { SpawnSubagentTool } from '../tools/spawn_subagent.js';
 import { SkillTool } from '../tools/skill.js';
 import { TaskTool } from '../tools/task.js';
 import { TodoWriteTool } from '../tools/todoWrite.js';
@@ -1857,6 +1858,7 @@ export class Config {
     };
 
     registerCoreTool(TaskTool, this);
+    registerCoreTool(SpawnSubagentTool, this);
     registerCoreTool(SkillTool, this);
     registerCoreTool(LSTool, this);
     registerCoreTool(ReadFileTool, this);
