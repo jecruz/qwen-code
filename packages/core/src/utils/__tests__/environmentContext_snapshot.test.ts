@@ -16,7 +16,7 @@ vi.mock('../getFolderStructure.js', () => ({
 }));
 vi.mock('node:fs/promises');
 
-describe('getEnvironmentContext outline', () => {
+describe('getEnvironmentContext snapshot', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let mockConfig: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -50,49 +50,61 @@ describe('getEnvironmentContext outline', () => {
     vi.resetAllMocks();
   });
 
-  it('should include project outline when important files exist', async () => {
-    // Mock package.json existence and symbols
+  it('should include file content for small config files', async () => {
+    // Mock package.json existence and content
     vi.mocked(fs.stat).mockImplementation(
       async (filePath: string | Buffer | URL) => {
         if (typeof filePath === 'string' && filePath.endsWith('package.json')) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          return { isFile: () => true } as any;
+          return { isFile: () => true, size: 500 } as any;
+        }
+        throw new Error('Not found');
+      },
+    );
+
+    vi.mocked(fs.readFile).mockResolvedValue('{"name": "test-pkg"}');
+
+    const parts = await getEnvironmentContext(mockConfig as Config);
+    const context = parts[0].text;
+
+    expect(context).toContain('Project Context Snapshot:');
+    expect(context).toContain('--- File: package.json (Full Content) ---');
+    expect(context).toContain('{"name": "test-pkg"}');
+  });
+
+  it('should include symbol outline for source files', async () => {
+    // Mock index.ts existence and symbols
+    vi.mocked(fs.stat).mockImplementation(
+      async (filePath: string | Buffer | URL) => {
+        if (
+          typeof filePath === 'string' &&
+          (filePath.endsWith('src/index.ts') || filePath.endsWith('index.ts'))
+        ) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          return { isFile: () => true, size: 5000 } as any;
         }
         throw new Error('Not found');
       },
     );
 
     mockLspClient.documentSymbols.mockResolvedValue([
-      { name: 'my-package', kind: 'Module' },
-      { name: 'version', kind: 'Property' },
+      { name: 'start', kind: 'Function' },
     ]);
 
     const parts = await getEnvironmentContext(mockConfig as Config);
     const context = parts[0].text;
 
-    expect(context).toContain('Project Outline (Top-level symbols):');
-    expect(context).toContain('Outline for package.json:');
-    expect(context).toContain('- my-package (Module)');
-    expect(context).toContain('- version (Property)');
+    expect(context).toContain('--- File: index.ts (Symbol Outline) ---');
+    expect(context).toContain('- start (Function)');
   });
 
-  it('should not include project outline when disabled', async () => {
+  it('should not include project snapshot when disabled', async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (mockConfig.getAutomaticIndexingEnabled as any).mockReturnValue(false);
 
     const parts = await getEnvironmentContext(mockConfig as Config);
     const context = parts[0].text;
 
-    expect(context).not.toContain('Project Outline (Top-level symbols):');
-  });
-
-  it('should handle missing LSP client gracefully', async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (mockConfig.getLspClient as any).mockReturnValue(undefined);
-
-    const parts = await getEnvironmentContext(mockConfig as Config);
-    const context = parts[0].text;
-
-    expect(context).not.toContain('Project Outline (Top-level symbols):');
+    expect(context).not.toContain('Project Context Snapshot:');
   });
 });

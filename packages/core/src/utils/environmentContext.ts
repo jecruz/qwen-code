@@ -47,63 +47,86 @@ ${folderStructure}`;
 }
 
 /**
- * Generates an outline of important files in the workspace.
+ * Generates a snapshot of important files in the workspace, including content for config files
+ * and outlines for source files.
  */
-async function getProjectOutline(config: Config): Promise<string> {
+async function getProjectContextSnapshot(config: Config): Promise<string> {
   if (!config.getAutomaticIndexingEnabled()) {
     return '';
   }
 
   const lspClient = config.getLspClient();
-  if (!lspClient) {
-    return '';
-  }
-
   const workspaceRoot = config.getWorkspaceContext().getDirectories()[0];
   if (!workspaceRoot) {
     return '';
   }
 
-  // Important files to gather outlines for
-  const importantFiles = [
+  // Files where we prefer the full content (if small)
+  const contentPreferredFiles = [
     'package.json',
-    'README.md',
     'tsconfig.json',
+    '.antigravityignore',
+    'README.md',
+  ];
+
+  // Files where we prefer a symbol outline
+  const outlinePreferredFiles = [
     'src/index.ts',
     'src/main.ts',
     'index.ts',
     'main.ts',
+    'packages/core/src/index.ts',
   ];
 
-  const outlines: string[] = [];
+  const snapshots: string[] = [];
+  const MAX_CONTENT_SIZE = 10 * 1024; // 10KB
 
-  for (const file of importantFiles) {
+  // Process Content-Preferred files
+  for (const file of contentPreferredFiles) {
     const fullPath = path.resolve(workspaceRoot, file);
     try {
       const stats = await fs.stat(fullPath);
-      if (stats.isFile()) {
-        const symbols = await lspClient.documentSymbols(`file://${fullPath}`);
-        if (symbols && symbols.length > 0) {
-          const symbolList = symbols
-            .slice(0, 20) // Limit to top 20 symbols per file
-            .map(
-              (s: { name: string; kind?: string }) =>
-                `  - ${s.name} (${s.kind})`,
-            )
-            .join('\n');
-          outlines.push(`Outline for ${file}:\n${symbolList}`);
-        }
+      if (stats.isFile() && stats.size < MAX_CONTENT_SIZE) {
+        const content = await fs.readFile(fullPath, 'utf-8');
+        snapshots.push(`--- File: ${file} (Full Content) ---\n${content}`);
       }
     } catch (_error) {
-      // Ignore errors if LSP is not ready or file doesn't exist
+      // Ignore missing files
     }
   }
 
-  if (outlines.length === 0) {
+  // Process Outline-Preferred files
+  if (lspClient) {
+    for (const file of outlinePreferredFiles) {
+      const fullPath = path.resolve(workspaceRoot, file);
+      try {
+        const stats = await fs.stat(fullPath);
+        if (stats.isFile()) {
+          const symbols = await lspClient.documentSymbols(`file://${fullPath}`);
+          if (symbols && symbols.length > 0) {
+            const symbolList = symbols
+              .slice(0, 20) // Limit to top 20 symbols
+              .map(
+                (s: { name: string; kind?: string }) =>
+                  `  - ${s.name} (${s.kind})`,
+              )
+              .join('\n');
+            snapshots.push(
+              `--- File: ${file} (Symbol Outline) ---\n${symbolList}`,
+            );
+          }
+        }
+      } catch (_error) {
+        // Ignore errors
+      }
+    }
+  }
+
+  if (snapshots.length === 0) {
     return '';
   }
 
-  return `\n\nProject Outline (Top-level symbols):\n\n${outlines.join('\n\n')}`;
+  return `\n\nProject Context Snapshot:\n\n${snapshots.join('\n\n')}`;
 }
 
 /**
@@ -121,13 +144,13 @@ export async function getEnvironmentContext(config: Config): Promise<Part[]> {
   });
   const platform = process.platform;
   const directoryContext = await getDirectoryContextString(config);
-  const projectOutline = await getProjectOutline(config);
+  const projectSnapshot = await getProjectContextSnapshot(config);
 
   const context = `
 This is the Qwen Code. We are setting up the context for our chat.
 Today's date is ${today} (formatted according to the user's locale).
 My operating system is: ${platform}
-${directoryContext}${projectOutline}
+${directoryContext}${projectSnapshot}
         `.trim();
 
   return [{ text: context }];
